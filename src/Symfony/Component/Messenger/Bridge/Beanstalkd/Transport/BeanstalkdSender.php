@@ -11,6 +11,7 @@
 
 namespace Symfony\Component\Messenger\Bridge\Beanstalkd\Transport;
 
+use Symfony\Component\Messenger\Bridge\Beanstalkd\Transport\BeanstalkdTubeStamp;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Stamp\DelayStamp;
 use Symfony\Component\Messenger\Stamp\TransportMessageIdStamp;
@@ -41,6 +42,7 @@ class BeanstalkdSender implements SenderInterface
             $encodedMessage['headers'] ?? [],
             $envelope->last(DelayStamp::class)?->getDelay() ?? 0,
             $envelope->last(BeanstalkdPriorityStamp::class)?->priority,
+            $envelope->last(BeanstalkdTubeStamp::class)?->tubeName
         );
 
         return $envelope->with(new TransportMessageIdStamp($id));

@@ -11,10 +11,12 @@
 
 namespace Symfony\Component\Messenger\Bridge\Beanstalkd\Tests\Transport;
 
+use Pheanstalk\Values\TubeName;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Messenger\Bridge\Beanstalkd\Tests\Fixtures\DummyMessage;
 use Symfony\Component\Messenger\Bridge\Beanstalkd\Transport\BeanstalkdPriorityStamp;
 use Symfony\Component\Messenger\Bridge\Beanstalkd\Transport\BeanstalkdSender;
+use Symfony\Component\Messenger\Bridge\Beanstalkd\Transport\BeanstalkdTubeStamp;
 use Symfony\Component\Messenger\Bridge\Beanstalkd\Transport\Connection;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Stamp\DelayStamp;
@@ -68,6 +70,22 @@ final class BeanstalkdSenderTest extends TestCase
 
         $connection = $this->createMock(Connection::class);
         $connection->expects($this->once())->method('send')->with($encoded['body'], $encoded['headers'], 0, 2);
+
+        $serializer = $this->createMock(SerializerInterface::class);
+        $serializer->expects($this->once())->method('encode')->with($envelope)->willReturn($encoded);
+
+        $sender = new BeanstalkdSender($connection, $serializer);
+        $sender->send($envelope);
+    }
+
+    public function testSendWithSpecificTubeName()
+    {
+        $tube = new TubeName('foo');
+        $envelope = (new Envelope(new DummyMessage('Oy')))->with(new BeanstalkdTubeStamp($tube));
+        $encoded = ['body' => '...', 'headers' => ['type' => DummyMessage::class]];
+
+        $connection = $this->createMock(Connection::class);
+        $connection->expects($this->once())->method('send')->with($encoded['body'], $encoded['headers'], 0, null, $tube);
 
         $serializer = $this->createMock(SerializerInterface::class);
         $serializer->expects($this->once())->method('encode')->with($envelope)->willReturn($encoded);

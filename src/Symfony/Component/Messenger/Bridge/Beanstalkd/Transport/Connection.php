@@ -131,7 +131,7 @@ class Connection
      *
      * @return string The inserted id
      */
-    public function send(string $body, array $headers, int $delay = 0, ?int $priority = null): string
+    public function send(string $body, array $headers, int $delay = 0, ?int $priority = null, $tubeName = null): string
     {
         try {
             $message = json_encode([
@@ -142,16 +142,18 @@ class Connection
             throw new TransportException($exception->getMessage(), 0, $exception);
         }
 
-        return $this->withReconnect(function () use ($message, $delay, $priority) {
-            $this->useTube();
-            $job = $this->client->put(
-                $message,
-                $priority ?? PheanstalkPublisherInterface::DEFAULT_PRIORITY,
-                (int) ($delay / 1000),
-                $this->ttr
+        return $this->withReconnect(function () use ($message, $delay, $priority, $tubeName) {
+            return $this->withTubeName(
+                fn() => $this->client
+                    ->put(
+                        $message,
+                        $priority ?? PheanstalkPublisherInterface::DEFAULT_PRIORITY,
+                        (int) ($delay / 1000),
+                        $this->ttr
+                    )
+                    ->getId(),
+                $tubeName ?? $this->tube,
             );
-
-            return $job->getId();
         });
     }
 
@@ -330,6 +332,30 @@ class Connection
                 pcntl_async_signals(true);
                 pcntl_signal_dispatch();
             }
+        }
+    }
+
+    /**
+     * @template TValue
+     * @param callable(): TValue $callback
+     *
+     * @return TValue
+     */
+    private function withTubeName(callable $callback, TubeName $tubeName): mixed
+    {
+        if ($this->tube->value === $tubeName->value) {
+            $this->useTube();
+
+            return $callback();
+        }
+
+        $usedTube = $this->tube;
+        try {
+            $this->client->useTube($tubeName);
+
+            return $callback();
+        } finally {
+            $this->client->useTube($usedTube);
         }
     }
 }
